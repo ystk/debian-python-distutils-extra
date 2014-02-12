@@ -25,10 +25,14 @@ class build_help(distutils.cmd.Command):
             path_xml = os.path.join('share/gnome/help', name, lang)
             path_figures = os.path.join('share/gnome/help', name, lang, 'figures')
             
-            data_files.append((path_xml, glob('%s/*.xml' % path)))
+            docbook_files = glob('%s/*.xml' % path)
+            mallard_files = glob('%s/*.page' % path)
+            data_files.append((path_xml, docbook_files + mallard_files))
             data_files.append((path_figures, glob('%s/figures/*.png' % path)))
         
-        data_files.append((os.path.join('share', 'omf', name), glob(omf_pattern)))
+        omf_files = glob(omf_pattern)
+        if omf_files:
+            data_files.append((os.path.join('share', 'omf', name), omf_files))
         
         return data_files
     

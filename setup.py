@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from setuptools import setup
-import glob, os, commands, sys
+import sys
 
 sys.path.insert(0, '.')
 from DistUtilsExtra import __version__ as pkgversion
@@ -21,6 +21,6 @@ setup(
            "build_icons = DistUtilsExtra.command.build_icons:build_icons",
            "build_help = DistUtilsExtra.command.build_help:build_help",
            "clean_i18n = DistUtilsExtra.command.clean_i18n:clean_i18n",
-           "check = DistUtilsExtra.command.check:check",
+           "pylint = DistUtilsExtra.command.pylint:pylint",
         ],},
 )

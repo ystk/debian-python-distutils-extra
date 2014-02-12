@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import distutils
 import glob
 import os
@@ -28,19 +26,19 @@ class build_extra(distutils.command.build.build):
     def finalize_options(self):
         def has_help(command):
             return self.help == "True" or \
-                   (self.distribution.cmdclass.has_key("build_help") and not \
+                   ("build_help" in self.distribution.cmdclass and not \
                     self.help == "False")
         def has_icons(command):
             return self.icons == "True" or \
-                   (self.distribution.cmdclass.has_key("build_icons") and not \
+                   ("build_icons" in self.distribution.cmdclass and not \
                     self.help == "False")
         def has_i18n(command):
             return self.i18n == "True" or \
-                   (self.distribution.cmdclass.has_key("build_i18n") and not \
+                   ("build_i18n" in self.distribution.cmdclass and not \
                     self.i18n == "False")
         def has_kdeui(command):
             return self.kdeui == "True" or \
-                   (self.distribution.cmdclass.has_key("build_kdeui") and not \
+                   ("build_kdeui" in self.distribution.cmdclass and not \
                     self.kdeui == "False")
 
         distutils.command.build.build.finalize_options(self)

@@ -1,3 +1,367 @@
+python-distutils-extra (2.36-1) unstable; urgency=low
+
+  * debian/rules: Run tests against all supported python 2 and 3 versions.
+    This catches bugs with Python 2.6. (Closes: #684967)
+  * debian/rules: Skip tests if $DEB_BUILD_OPTIONS contains "nocheck".
+    (Closes: #684966)
+  * debian/rules: Run tests under LC_ALL=C, to fix FTBFS in cases where
+    LC_CTYPE is set explicitly. Thanks Gregor Hermann!
+  * auto.py: Use python 2.6 friendly sys.version_info test. Thanks Salvatore
+    Bonaccorso and Gregor Hermann! (First half of #682631)
+  * auto.py: Do not call decode() with an "errors" keyword, as this does not
+    yet work with Python 2.6. Thanks Gregor Hermann! (Closes: #682631)
+
+ -- Martin Pitt <mpitt@debian.org>  Wed, 15 Aug 2012 11:20:58 +0200
+
+python-distutils-extra (2.35-1) unstable; urgency=low
+
+  * auto.py: Fix printing of unrecognized non-ASCII file names under ASCII
+    locales. (LP: #1025031)
+  * auto.py: Fix detection of extensionless Python scripts with non-ASCII
+    characters in the first few lines. (LP: #1025022)
+
+ -- Martin Pitt <mpitt@debian.org>  Fri, 03 Aug 2012 13:56:14 +0200
+
+python-distutils-extra (2.34-1) unstable; urgency=low
+
+  [ Martin Pitt ]
+  * debian/rules: Run Python3 tests under C locale, to expose more unicode
+    errors.
+  * auto.py: Fix *.ui detection to be robust for non-ASCII files.
+    (LP: #1017468)
+
+  [ Didier Roche ]
+  * auto.py: Fix a regression with python2 if files have some utf-8 directives
+    (LP: #1021969)
+
+ -- Martin Pitt <mpitt@debian.org>  Mon, 09 Jul 2012 11:12:38 +0200
+
+python-distutils-extra (2.33-1) unstable; urgency=low
+
+  * auto.py: Fix crash when encountering binary files with Python 3.
+    (LP: #995653)
+  * auto.py: Fix crash when encountering an UTF-8 Python source code file.
+
+ -- Martin Pitt <mpitt@debian.org>  Mon, 11 Jun 2012 18:14:28 +0200
+
+python-distutils-extra (2.32-5) unstable; urgency=low
+
+  [ Andrew Starr-Bochicchio ]
+  * debian/local/python-mkdebian cleanups: (LP: #706051)
+    - Don't use {XS, XB}-Python-Version.
+    - Generate an up to date Standards-Version.
+    - Generate build dep on debhelper (>= 8) as debian/compat is set to '8'
+      and debhelper overrides are used.
+    - No need to generate a build dep on cdbs.
+
+  [ Martin Pitt ]
+  * debian/local/python-mkdebian: For projects using --prefix, install
+    binaries into a .../bin/ subdirectory instead of into the main project
+    directory. This avoids potential name collisions with local Python
+    modules. Thanks to Michael Terry for the patch!
+
+ -- Martin Pitt <mpitt@debian.org>  Fri, 25 May 2012 06:53:25 +0200
+
+python-distutils-extra (2.32-4) unstable; urgency=low
+
+  * debian/local/python-mkdebian: Create copyright format 1.0 compatible
+    copyright files. Thanks Andrew Starr-Bochicchio! (LP: #1002379)
+  * debian/copyright: Update to copyright 1.0 format.
+  * debian/control: Bump Standards-Version to 3.9.3.
+
+ -- Martin Pitt <mpitt@debian.org>  Wed, 23 May 2012 17:13:50 +0200
+
+python-distutils-extra (2.32-3) unstable; urgency=low
+
+  * python-mkdebian: Fix wrong kde4 ui file detection regular expression.
+    Thanks Angelo Compagnucci! (LP: #1002076)
+
+ -- Martin Pitt <mpitt@debian.org>  Mon, 21 May 2012 07:56:37 +0200
+
+python-distutils-extra (2.32-2) unstable; urgency=low
+
+  [ Michael Terry ]
+  * python-mkdebian: If installing into a prefix, also install data there
+
+ -- Martin Pitt <mpitt@debian.org>  Wed, 07 Mar 2012 07:15:56 +0100
+
+python-distutils-extra (2.32-1) unstable; urgency=low
+
+  * auto.py: Add support for installing GSettings schema files
+    (*.gsettings.xml). Thanks to Frederik Elwert! (LP: #936546)
+
+ -- Martin Pitt <mpitt@debian.org>  Fri, 02 Mar 2012 17:52:08 +0100
+
+python-distutils-extra (2.31-3) unstable; urgency=low
+
+  [ Michael Vogt ]
+  * python-mkdebian: Update to use dh_python2, dh7 and a more current DEP-5
+    format.
+
+  [ Martin Pitt ]
+  * python-mkdebian: In above dh7 conversion, use the "translations" module if
+    available (for Ubuntu's dh-translations).
+
+ -- Martin Pitt <mpitt@debian.org>  Tue, 03 Jan 2012 17:09:28 +0100
+
+python-distutils-extra (2.31-2) unstable; urgency=low
+
+  * debian/control: Move from python{,3}-gobject to -gi.
+
+ -- Martin Pitt <mpitt@debian.org>  Mon, 05 Dec 2011 17:57:37 +0100
+
+python-distutils-extra (2.31-1) unstable; urgency=low
+
+  * auto.py: Also catch ValueError and RuntimeError on relative imports.
+    Thanks Mike Terry for the patch! Add corresponding test case to
+    test/auto.py.
+  * auto.py: Fix crash in module dependency generator, uncovered by previously
+    added test case.
+  * debian/local/python-mkdebian: Ignore -dbg packages when calculating
+    dependencies, to avoid finding multiple matches.
+  * debian/local/python-mkdebian: Ignore RuntimeErrors from module imports
+    when calculating dependencies, to fix a crash when trying to import
+    gi.repository.Gtk without a $DISPLAY.
+
+ -- Martin Pitt <mpitt@debian.org>  Tue, 08 Nov 2011 16:52:14 +0100
+
+python-distutils-extra (2.30-2) unstable; urgency=low
+
+  * debian/control: Add python-gobject and python3-gobject build dependencies,
+    for the test suite to succeed on the buildds.
+
+ -- Martin Pitt <mpitt@debian.org>  Tue, 25 Oct 2011 08:27:17 +0200
+
+python-distutils-extra (2.30-1) unstable; urgency=low
+
+  * auto.py, debian/local/python-mkdebian: Properly support
+    GI repository module detection. Thanks to Owais Lone for the patch!
+    (LP: #806533)
+  * test/auto.py: Add GI test case. Add gir1.2-glib-2.0 build dependency for
+    the test case.
+  * debian/local/python-mkdebian: Call dh_icons. (LP: #881021)
+
+ -- Martin Pitt <mpitt@debian.org>  Tue, 25 Oct 2011 08:00:38 +0200
+
+python-distutils-extra (2.29-1) unstable; urgency=low
+
+  [ Martin Pitt ]
+  * Drop support for the long-obsolete PolicyKit (pre polkit 1.0 API).
+
+  [ Rodney Dawes ]
+  * auto.py: Ignore RuntimeError, which Gdk/Gtk throw if DISPLAY is unset.
+    (LP: #735408)
+
+ -- Martin Pitt <mpitt@debian.org>  Mon, 22 Aug 2011 07:02:19 +0200
+
+python-distutils-extra (2.28-1) unstable; urgency=medium
+
+  * Urgency medium as this fixes a nasty regression from 2.27 which causes
+    some packages to FTBFS.
+  * debian/local/python-mkdebian{,.1}: Change --force-control from a binary to
+    a ternary option with modes "none" (don't touch it at all), "deps" (only
+    update dependencies; old and new default behaviour), and "full" (always
+    regenerate it). Update the manpage accordingly. Thanks to Jordan Mantha
+    for the patch!
+  * test/auto.py: Add test for a local module which raises an exception
+    (replicates the current xdiagnose FTBFS), and a local module which runs
+    optparse on import (replicates the current onboard bzr head FTBFS).
+  * auto.py, __external_mod(): Put back the early decision for locally
+    provided modules based on their name, without importing them. Running
+    __import__ is dangerous in some cases like the above two, but
+    unfortunately necessary to fully determine relative imports. This is still
+    not quite perfect, as it will fail the same way if externally provided
+    modules do dangerous things on mere imports, but at least fixes the
+    regression from r248 (release 2.27). (See LP #746565)
+
+ -- Martin Pitt <mpitt@debian.org>  Thu, 16 Jun 2011 13:39:30 +0200
+
+python-distutils-extra (2.27-1) unstable; urgency=low
+
+  * auto.py: Cleaner approach to determine whether a module is locally
+    provided. This now catches all relative imports. (LP: #746565)
+  * Fix installation of symlinks in data/ dir (LP: #770566):
+    - test/auto.py: Add test for installing a symlink which points to a
+      nonexisting target directory/file. This reproduces the gist of the
+      problem.
+    - test/auto.py: Preserve symlinks in copytree() calls, so that we can
+      actually verify that symlinks are preserved properly.
+    - test/auto.py: Drop requirement that diff throws no error messages, as it
+      will complain about the broken symlink.
+    - DistUtilsExtra/auto.py, install_auto: Use os.walk() instead of
+      distutils.filelist.findall() to pick out symlinks, as the latter fails
+      badly with broken symlinks.
+    - DistUtilsExtra/command/build_icons.py: Ignore symbolic links. distutils
+      breaks on them when they point to a nonexisting target, and we handle
+      them in auto.py.
+  * DistUtilsExtra/auto.py: Put back "except .. as" syntax, now that we
+    dropped Python 2.5. Drop 2to3 from debian/rules for good now.
+  * debian/control: Bump minimal Python version to >= 2.6.
+
+ -- Martin Pitt <mpitt@debian.org>  Sat, 21 May 2011 13:17:57 +0200
+
+python-distutils-extra (2.26-2) unstable; urgency=low
+
+  [ Manuel de la Pena ]
+  * DistUtilsExtra/auto.py: Fix ValueError crash when scanning the
+    ctypes.wintypes import. (LP: #735698)
+
+ -- Martin Pitt <mpitt@debian.org>  Wed, 16 Mar 2011 15:56:20 +0100
+
+python-distutils-extra (2.26-1) unstable; urgency=low
+
+  [ Michael Terry ]
+  * build_help.py: Support mallard help files too. (LP: #729451)
+
+  [ Martin Pitt ]
+  * auto.py: Revert to "except SyntaxError, e" syntax, as Python 2.5 (which we
+    still support in current sid) does not yet get along with the new "as"
+    syntax. (Closes: #615177)
+  * debian/rules: Reintroduce 2to3 call, as we now need to convert above
+    except clause back to "as" for the Python 3.
+
+ -- Martin Pitt <mpitt@debian.org>  Tue, 15 Mar 2011 11:55:06 +0100
+
+python-distutils-extra (2.25-1) unstable; urgency=low
+
+  * Port code to be fully Python 3 compatible; apply some small tricks to
+    still work with Python 2 as well.
+  * debian/rules: Drop 2to3 call, unnecessary now.
+  * test/auto.py: Properly close read files to fix ResourceWarnings under
+    Python 3.
+  * test/auto.py: Ignore "pipe2 set errno ENOSYS; falling back to non-atomic
+    pipe+fcntl" warning which happens when building on the Ubuntu buildds (see
+    LP #718784). These cause unexpected stderr output and break the tests.
+
+ -- Martin Pitt <mpitt@debian.org>  Tue, 15 Feb 2011 12:41:49 +0100
+
+python-distutils-extra (2.24-1) unstable; urgency=low
+
+  * auto.py: Fix the string comparison to not install *.notifyrc.in files
+    twice. Thanks Éric Araujo for spotting this!
+  * DistUtilsExtra/auto.py, __provides(): Do not accidentally clobber
+    "py_modules" with "packages", by using a proper copy of the list. Remove
+    error filter workaround from test/auto.py.
+  * Rename "check" command to "pylint", to avoid clobbering distutils' own
+    check command in 2.7/3.x. (LP: #714655)
+  * DistUtilsExtra/auto.py, DistUtilsExtra/command/__init__.py: Actually
+    expose the pylint command as a setup.py command.
+  * Remove pykdeuic4 integration, it's been a continuous source of build
+    failures and bugs. Using uic.loadUi() is much more robust.
+    Instead, install Qt *.ui files into /usr/share/projectname/ just like the
+    GtkBuilder *.ui files.
+  * debian/compat, debian/control: Bump to dh 7 compatibility, as we are using
+    dh_auto_* magic.
+
+ -- Martin Pitt <mpitt@debian.org>  Fri, 11 Feb 2011 10:39:50 +0100
+
+python-distutils-extra (2.23-1) unstable; urgency=low
+
+  [ Didier Roche ]
+  * debian/local/python-mkdebian: (LP: #625581)
+    - add --force-rules to force the rules file to be recreated
+    - add --prefix to force a prefix other than /usr for installing your python
+      modules
+  * debian/local/python-mkdebian.1:
+    - add man for --force-copyright
+    - add man for --force-rules and --prefix
+
+ -- Martin Pitt <mpitt@debian.org>  Thu, 18 Nov 2010 11:39:08 +0100
+
+python-distutils-extra (2.22-4) unstable; urgency=low
+
+  [ Barry Warsaw ]
+  * When the environment has $PYTHONPATH in it, we still need to prepend
+    oldcwd in test/auto.py, so that the DistUtilsExtra package can be
+    found.  (LP: #670188)
+
+ -- Martin Pitt <mpitt@debian.org>  Thu, 04 Nov 2010 14:33:04 -0400
+
+python-distutils-extra (2.22-3) unstable; urgency=low
+
+  [ Martin Pitt ]
+  * auto.py: Skip setup.py when calculating automatic requires, since
+    modules from that script are just build dependencies. Thanks Michael
+    Terry! (LP: #643655)
+  * python-mkdebian: Update python-mkdebian's generated copyright fields with
+    latest names/values from http://dep.debian.net/deps/dep5/. Thanks Michael
+    Terry!
+  * Rebuild against Python 2.7 in Ubuntu. (LP: #670188)
+
+  [ Didier Roche ]
+  * Return an error when can't update changelog (LP: #656950)
+  * Add --force-copyright to force copyright file to be recreated
+    (LP: #656943)
+
+ -- Martin Pitt <mpitt@debian.org>  Wed, 03 Nov 2010 22:37:27 -0400
+
+python-distutils-extra (2.22-2) unstable; urgency=low
+
+  * Upload to unstable, now that the current python3 is in unstable.
+  * Add debian/watch.
+  * Add bzr-builddeb configuration (merge mode).
+  * debian/copyright: Add missing Canonical copyright (Closes: #597548).
+    While we are at it, also convert the file to DEP-5, and fix the
+    common-licenses link to point to the versioned GPL.
+  * DistUtilsExtra/command/check.py: Remove explicit GPL-3 license header, so
+    that the file falls under the package's general GPL-2+ license. Rodney
+    Dawes, the author, gave his explicit permission for this in #597548 (in
+    fact, GPL-3 was unintended in the first place).
+  * test/auto.py: Ignore python warning about import from local path.
+
+ -- Martin Pitt <mpitt@debian.org>  Thu, 23 Sep 2010 16:00:58 +0200
+
+python-distutils-extra (2.22-1) experimental; urgency=low
+
+  [ Matthias Klose ]
+  * setup.py: Drop import of "commands"; unused, and does not exist in
+    python3.
+  * Build a python3 package.
+
+  [ Martin Pitt ]
+  * DistUtilsExtra/command/build_extra.py: Use "in" operator instead of
+    has_key(). It's more elegant and Python 3 compatible.
+  * test/auto.py: Use Python3 compatible octal constant.
+  * test/auto.py: Decode stdout/stderr result from subprocess from bytes to
+    str, to work with Python3.
+  * test/auto.py: Use whichever Python interpreter we got invoked with (using
+    /proc/self/exe) instead of hardcoding "python". With that we can run the
+    tests through python3 as well.
+  * DistUtilsExtra/auto.py: Port from deprecated "compiler" module to current
+    "ast" module.
+  * test/auto.py: Only set PYTHONPATH if it isn't set already, so that we can
+    override it from outside.
+  * test/auto.py: Do not require that "setup.py clean -a" doesn't print
+    anything to stderr; with Python 3.1 it now sends out warnings about
+    nonexisting directories.
+  * test/auto.py: Changed print statements to work with both Python 2 and 3.
+  * DistUtilsExtra/command/build_extra.py: Drop unnecessary hashbang line.
+  * test/auto.py: Filter out bogus errors about missing files which current
+    Python 3 distutils spews out.
+  * debian/rules: Run tests with python3 as well, against the installed
+    modules in debian/python3-distutils-extra.
+  * test/auto.py, debian/control: Use python{,3}-{pkg-resources,httplib2} as
+    external test modules instead of -xdg and -dateutil, since the latter are
+    not available for Python 3 yet.
+  * debain/source/format: Switch to 3.0 (quilt), since we produce upstream
+    tarballs and releases.
+
+ -- Martin Pitt <mpitt@debian.org>  Thu, 16 Sep 2010 20:25:24 +0200
+
+python-distutils-extra (2.21) unstable; urgency=low
+
+  [ Umang Varma ]
+  * python-mkdebian: Fix duplicate dependency substitutions. (LP: #608304)
+  * python-mkdebian: Add --distribution switch for the changelog. If not
+    specified, python-mkdebian will detect the distribution as before.
+    (LP: #608589)
+  * python-mkdebian: Add --no-changelog flag. (LP: #587538)
+
+  [ Martin Pitt ]
+  * debian/control: Bump Standards-Version to 3.9.1, no changes necessary.
+
+ -- Martin Pitt <mpitt@debian.org>  Tue, 14 Sep 2010 11:51:37 +0200
+
 python-distutils-extra (2.20) unstable; urgency=low
 
   [ Didier Roche ]

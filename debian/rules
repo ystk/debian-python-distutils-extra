@@ -1,15 +1,35 @@
 #!/usr/bin/make -f
-DEB_PYTHON_SYSTEM=pycentral
 
-include /usr/share/cdbs/1/rules/debhelper.mk
-include /usr/share/cdbs/1/class/python-distutils.mk
+%:
+	dh $@ --with python2,python3
 
-common-post-build-indep::
-	test/auto.py -v
+override_dh_auto_build:
+	dh_auto_build
+	set -ex; for python in $(shell py3versions -r); do \
+		$$python setup.py build; \
+	done
 
-install/python-distutils-extra::
-	install -D -m 755 debian/local/python-mkdebian debian/$(cdbs_curpkg)/usr/bin/python-mkdebian
+override_dh_auto_install:
+	dh_auto_install
+	install -D -m 755 debian/local/python-mkdebian debian/python-distutils-extra/usr/bin/python-mkdebian
 
-clean::
+	# build python3 module
+	set -ex; for python in $(shell py3versions -r); do \
+		$$python setup.py install --root=$(CURDIR)/debian/python3-distutils-extra --install-layout=deb; \
+	done
+	#install -D -m 755 debian/local/python-mkdebian debian/python3-distutils-extra/usr/bin/python3-mkdebian
+	#sed -i 's,^#!/usr/bin/python,#!/usr/bin/python3,' debian/python3-distutils-extra/usr/bin/python3-mkdebian
+
+override_dh_auto_test:
+ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	# run tests with all supported python 2 and 3 versions
+	set -e; for python in `pyversions -s` `py3versions -s`; do \
+	  echo "-- Running tests with $$python ----------------"; \
+	  LC_ALL=C LANGUAGE= LANG=C PYTHONPATH=. $$python test/auto.py -v; \
+	done
+endif
+
+override_dh_auto_clean:
+	dh_auto_clean
 	rm -rf build
 	rm -rf python_distutils_extra.egg-info

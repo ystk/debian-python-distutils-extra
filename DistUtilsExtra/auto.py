@@ -10,10 +10,11 @@ This currently supports:
  * Python modules (./*.py, only in root directory)
  * Python packages (all directories with __init__.py)
  * Docbook-XML GNOME help files (help/<language>/{*.xml,*.omf,figures})
- * GtkBuilder (*.ui) [installed into prefix/share/<projectname>/]
- * Qt4 user interfaces (*.ui) [compiled with pykdeuic into Python modules]
+ * GtkBuilder and Qt4 user interfaces (*.ui) [installed into
+   prefix/share/<projectname>/]
  * D-Bus (*.conf and *.service)
- * PolicyKit (*.policy.in)
+ * GSettings schemas (*.gschema.xml)
+ * polkit (*.policy.in)
  * Desktop files (*.desktop.in) [into prefix/share/applications, or
    prefix/share/autostart if they have "autostart" anywhere in the path]
  * KDE4 notifications (*.notifyrc.in)
@@ -38,8 +39,9 @@ author, license, etc.) in ./setup.py.
 # Author: Martin Pitt <martin.pitt@ubuntu.com>
 
 import os, os.path, fnmatch, stat, sys, subprocess
-import compiler # TODO: deprecated
+import ast, locale
 import distutils.core
+from functools import reduce
 
 from DistUtilsExtra import __version__ as __pkgversion
 from DistUtilsExtra.command import *
@@ -84,11 +86,12 @@ def setup(**attrs):
     __packages(attrs, src)
     __provides(attrs, src)
     __dbus(attrs, src)
+    __gschema(attrs, src)
     __apport_hooks(attrs, src)
     __data(attrs, src)
     __scripts(attrs, src)
     __stdfiles(attrs, src)
-    __gtkbuilder(attrs, src)
+    __ui(attrs, src)
     __manpages(attrs, src)
 
     if 'clean' not in sys.argv:
@@ -97,9 +100,16 @@ def setup(**attrs):
     distutils.core.setup(**attrs)
 
     if src:
-        print 'WARNING: the following files are not recognized by DistUtilsExtra.auto:'
+        print('WARNING: the following files are not recognized by DistUtilsExtra.auto:')
+        enc = locale.getpreferredencoding()
         for f in sorted(src):
-            print ' ', f
+            # ensure that we can always print the file name
+            if(sys.version_info[0] < 3):
+                # hack to make this work with Python 2
+                f_loc = f.decode('ascii', 'ignore')
+            else:
+                f_loc = f.encode(enc, errors='replace').decode(enc, errors='replace')
+            print ('  ' + f_loc)
 
 #
 # parts of setup()
@@ -123,16 +133,17 @@ def __cmdclass(attrs):
     v.setdefault('build_help', build_help_auto)
     v.setdefault('build_i18n', build_i18n_auto)
     v.setdefault('build_icons', build_icons.build_icons)
-    v.setdefault('build_kdeui', build_kdeui_auto)
     v.setdefault('install', install_auto)
     v.setdefault('clean', clean_build_tree)
     v.setdefault('sdist', sdist_auto)
+    v.setdefault('pylint', pylint.pylint)
 
 def __modules(attrs, src):
     '''Default modules'''
 
     if 'py_modules' in attrs:
         for mod in attrs['py_modules']:
+            print(mod)
             src_markglob(src, os.path.join(mod, '*.py'))
         return
 
@@ -194,6 +205,17 @@ def __dbus(attrs, src):
     if session_service:
         v.append(('share/dbus-1/services', session_service))
 
+def __gschema(attrs, src):
+    '''Install GSettings schema files'''
+    
+    v = attrs.setdefault('data_files', [])
+    schema_glob = '*.gschema.xml'
+    schemas = src_fileglob(src, schema_glob)
+    if schemas:
+        src_markglob(src, schema_glob)
+        src_markglob(src, '*gschemas.compiled')
+        v.append(('share/glib-2.0/schemas/', schemas))
+
 def __apport_hooks(attrs, src):      
     '''Apport hooks'''  
     v = attrs.setdefault('data_files', [])
@@ -221,7 +243,7 @@ def __data(attrs, src):
     data_files = []
     for f in src.copy():
         if f.startswith('data/') and not f.startswith('data/icons/') and \
-                not f.endswith('.desktop.in') and not f.endswith('*.notifyrc.in'):
+                not f.endswith('.desktop.in') and not f.endswith('.notifyrc.in'):
             if not os.path.islink(f):
                 # symlinks are handled in install_auto
                 v.append((os.path.join('share', attrs['name'], os.path.dirname(f[5:])), [f]))
@@ -275,13 +297,16 @@ def __stdfiles(attrs, src):
         attrs.setdefault('data_files', []).append((os.path.join('share', 'doc',
             attrs['name']), readme))
 
-def __gtkbuilder(attrs, src):
-    '''Install GtkBuilder *.ui files'''
+def __ui(attrs, src):
+    '''Install GtkBuilder/Qt *.ui files'''
 
     ui = []
     for f in src_fileglob(src, '*.ui'):
-        contents = open(f).read()
-        if ('<interface>\n' in contents or '<interface ' in contents) and 'class="Gtk' in contents:
+        fd = open(f, 'rb')
+        firstlines = fd.readline()
+        firstlines += b'\n' + fd.readline()
+        fd.close()
+        if b'<interface' in firstlines or b'<ui version=' in firstlines:
             src_mark(src, f)
             ui.append(f)
     if ui:
@@ -300,13 +325,14 @@ def __manpages(attrs, src):
             src_mark(src, f)
             mans.setdefault(f[-1], []).append(f)
     v = attrs.setdefault('data_files', [])
-    for section, files in mans.iteritems():
+    for section, files in mans.items():
         v.append((os.path.join('share', 'man', 'man' + section), files))
 
-def __external_mod(module, attrs):
+def __external_mod(cur_module, module, attrs):
     '''Check if given Python module is not included in Python or locally'''
 
-    # filter out locally provided modules
+    # filter out locally provided modules early, to avoid importing them (which
+    # might raise an exception, or parse argv, etc.)
     if module in attrs['provides']:
         return False
     for m in _module_parents(module):
@@ -314,34 +340,73 @@ def __external_mod(module, attrs):
             return False
 
     try:
-        path = __import__(module).__file__
+        mod = __import__(module)
     except ImportError:
-        print >> sys.stderr, 'ERROR: Python module %s not found' % module
-        return False
-    except AttributeError: # builtin modules
+        # try relative import
+        try:
+            if cur_module:
+                mod = __import__(cur_module + '.' + module)
+            else:
+                raise ImportError
+        except ImportError:
+            sys.stderr.write('ERROR: Python module %s not found\n' % module)
+            return False
+        except ValueError: # weird ctypes case with wintypes
+            return False 
+        except RuntimeError: # When Gdk can't be initialized
+            return False
+    except ValueError: # weird ctypes case with wintypes
+        return False 
+    except RuntimeError: # When Gdk can't be initialized
         return False
 
-    return 'dist-packages' in path or 'site-packages' in path or \
-            not path.startswith(os.path.dirname(os.__file__))
+    if not hasattr(mod, '__file__'):
+        # builtin module
+        return False
+
+    # filter out locally provided modules
+    if mod.__name__ in attrs['provides']:
+        return False
+
+    return 'dist-packages' in mod.__file__ or 'site-packages' in mod.__file__ or \
+            not mod.__file__.startswith(os.path.dirname(os.__file__))
 
 def __add_imports(imports, file, attrs):
     '''Add all imported modules from file to imports set.
 
     This filters out modules which are shipped with Python itself.
     '''
-    try:
-        ast = compiler.parseFile(file)
+    if os.path.exists(os.path.join(os.path.dirname(file), '__init__.py')):
+        cur_module = '.'.join(file.split(os.path.sep)[:-1])
+    else:
+        # this might happen for paths like bin/<script> which we do not want to
+        # treat as module for checking relative imports
+        cur_module = None
 
-        for node in ast.node.nodes:
-            if isinstance(node, compiler.ast.Import):
-                for name, _ in node.names:
-                    if __external_mod(name, attrs):
-                        imports.add(name)
-            if isinstance(node, compiler.ast.From):
-                if __external_mod(node.modname, attrs):
-                    imports.add(node.modname)
-    except SyntaxError, e:
-        print >> sys.stderr, 'WARNING: syntax errors in', file, ':', e
+    try:
+        with open(file, 'rb') as f:
+            # send binary blob for python2, otherwise sending an unicode object with
+            # "encoding" directive makes ast triggering an exception in python2
+            if(sys.version_info[0] < 3):
+                file_content = f.read()
+            else:
+                file_content = f.read().decode('UTF-8')
+            tree = ast.parse(file_content, file)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name and __external_mod(cur_module, alias.name, attrs):
+                        imports.add(alias.name)
+            if isinstance(node, ast.ImportFrom):
+                if node.module == 'gi.repository':
+                    for name in node.names:
+                        imports.add('gi.repository.%s' % name.name)
+
+                elif node.module and __external_mod(cur_module, node.module, attrs):
+                    imports.add(node.module)
+    except SyntaxError as e:
+        sys.stderr.write('WARNING: syntax errors in %s: %s\n' % (file, str(e)))
 
 def _module_parents(mod):
     '''Iterate over all parents of a module'''
@@ -361,6 +426,9 @@ def __filter_namespace(modules):
     result = set()
 
     for m in modules:
+        if m.startswith('gi.repository.'):
+            result.add(m)
+            continue
         for p in _module_parents(m):
             if p in modules:
                 break
@@ -379,12 +447,17 @@ def __requires(attrs, src_all):
 
     # iterate over all *.py and scripts which are Python
     for s in src_all:
+        if s == 'setup.py':
+            continue
         if s.startswith('data' + os.path.sep):
             continue
         ext = os.path.splitext(s)[1]
         if ext == '':
-            f = open(s)
-            line = f.readline()
+            try:
+                with open(s) as f:
+                    line = f.readline()
+            except (UnicodeDecodeError, IOError):
+                continue
             if not line.startswith('#!') or 'python' not in line:
                 continue
         elif ext != '.py':
@@ -399,7 +472,7 @@ def __provides(attrs, src_all):
     if 'provides' in attrs:
         return
 
-    provides = attrs.get('py_modules', [])
+    provides = list(attrs.get('py_modules', [])) # we need a copy here
     for p in attrs.get('packages', []):
         provides.append(p.replace(os.path.sep, '.'))
     attrs['provides'] = __filter_namespace(provides)
@@ -486,24 +559,17 @@ class build_i18n_auto(build_i18n.build_i18n):
         global src
         global src_all
 
-        # add PolicyKit files
+        # add polkit files
         policy_files = []
         for f in src_fileglob(src, '*.policy.in'):
             src_mark(src, f)
             policy_files.append(f)
         if policy_files:
-            # check if we have PolicyKit 1 API
-            if subprocess.call(['grep', '-q', 'org\.freedesktop\.PolicyKit1'] +
-                    list(src_fileglob(src_all, '*.py')),
-                    stderr=subprocess.PIPE) == 0:
-                destdir = os.path.join('share', 'polkit-1', 'actions')
-            else:
-                destdir = os.path.join('share', 'PolicyKit', 'policy')
             try:
                 xf = eval(self.xml_files)
             except TypeError:
                 xf = []
-            xf.append((destdir, policy_files))
+            xf.append((os.path.join('share', 'polkit-1', 'actions'), policy_files))
             self.xml_files = repr(xf)
 
         # add desktop files
@@ -551,8 +617,8 @@ class build_i18n_auto(build_i18n.build_i18n):
                 files.update(src_fileglob(src_all, '*.policy.in'))
 
                 for f in src_fileglob(src_all, '*.ui'):
-                    contents = open(f).read()
-                    if ('<interface>\n' in contents or '<interface ' in contents) and 'class="Gtk' in contents:
+                    contents = open(f, 'rb').read()
+                    if (b'<interface>\n' in contents or b'<interface ' in contents) and b'class="Gtk' in contents:
                         files.add('[type: gettext/glade]' + f)
 
                 # find extensionless executable scripts which are Python files, and
@@ -562,8 +628,8 @@ class build_i18n_auto(build_i18n.build_i18n):
                     f_py = f + '.py'
                     if os.access(f, os.X_OK) and os.path.splitext(f)[1] == '' and \
                             not os.path.exists(f_py):
-                        line = open(f).readline()
-                        if line.startswith('#!') and 'python' in line:
+                        line = open(f, 'rb').readline()
+                        if line.startswith(b'#!') and b'python' in line:
                             os.symlink(os.path.basename(f), f_py)
                             files.add(f_py)
                             exe_symlinks.append(f_py)
@@ -572,9 +638,9 @@ class build_i18n_auto(build_i18n.build_i18n):
                     if not os.path.isdir('po'):
                         os.mkdir('po')
                     potfiles_in = open('po/POTFILES.in', 'w')
-                    print >> potfiles_in, '[encoding: UTF-8]'
+                    potfiles_in.write('[encoding: UTF-8]\n')
                     for f in files:
-                        print >> potfiles_in, f
+                        potfiles_in.write(f + '\n')
                     potfiles_in.close()
 
                     auto_potfiles_in = True
@@ -590,30 +656,6 @@ class build_i18n_auto(build_i18n.build_i18n):
                 os.rmdir('po')
             except:
                 pass
-
-class build_kdeui_auto(build_kdeui.build_kdeui):
-    def finalize_options(self):
-        global src
-
-        # add *.ui files which belong to KDE4
-        kdeui_files = []
-        for f in src_fileglob(src, '*.ui'):
-            fd = open(f)
-            # might be on the first or second line
-            if fd.readline().startswith('<ui version="') or \
-               fd.readline().startswith('<ui version="'):
-                src_mark(src, f)
-                kdeui_files.append(f)
-            fd.close()
-        if kdeui_files:
-            try:
-                uf = eval(self.ui_files)
-            except TypeError:
-                uf = []
-            uf += kdeui_files
-            self.ui_files = repr(uf)
-
-        build_kdeui.build_kdeui.finalize_options(self)
 
 #
 # Automatic sdist
@@ -676,26 +718,29 @@ class install_auto(distutils.command.install.install):
                     preserve_times=0, preserve_symlinks=1, verbose=1)
 
         # install data/scripts symlinks
-        for f in distutils.filelist.findall():
-            if not os.path.islink(f):
-                continue
-            if f.startswith('bin/') or f.startswith('data/'):
-                if f.startswith('bin'):
-                    dir = self.install_scripts
-                    dest = os.path.join(dir, os.path.sep.join(f.split(os.path.sep)[1:]))
-                elif f.startswith('data/icons'):
-                    dir = os.path.join(self.install_data, 'share', 'icons', 'hicolor')
-                    dest = os.path.join(dir, os.path.sep.join(f.split(os.path.sep)[2:]))
-                else:
-                    dir = os.path.join(self.install_data, 'share', self.distribution.get_name())
-                    dest = os.path.join(dir, os.path.sep.join(f.split(os.path.sep)[1:]))
+        for (path, dirs, files) in os.walk('.'):
+            for f in files:
+                f = os.path.join(path, f)
+                if not os.path.islink(f):
+                    continue
 
-                d = os.path.dirname(dest)
-                if not os.path.isdir(d):
-                    os.makedirs(d)
-                if os.path.exists(dest):
-                    os.unlink(dest)
-                os.symlink(os.readlink(f), dest)
+                if f.startswith('./bin/') or f.startswith('./data/'):
+                    if f.startswith('./bin'):
+                        dir = self.install_scripts
+                        dest = os.path.join(dir, os.path.sep.join(f.split(os.path.sep)[2:]))
+                    elif f.startswith('./data/icons'):
+                        dir = os.path.join(self.install_data, 'share', 'icons', 'hicolor')
+                        dest = os.path.join(dir, os.path.sep.join(f.split(os.path.sep)[3:]))
+                    else:
+                        dir = os.path.join(self.install_data, 'share', self.distribution.get_name())
+                        dest = os.path.join(dir, os.path.sep.join(f.split(os.path.sep)[2:]))
+
+                    d = os.path.dirname(dest)
+                    if not os.path.isdir(d):
+                        os.makedirs(d)
+                    if os.path.exists(dest):
+                        os.unlink(dest)
+                    os.symlink(os.readlink(f), dest)
 
         distutils.command.install.install.run(self)
 

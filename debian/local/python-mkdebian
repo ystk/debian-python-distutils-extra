@@ -45,7 +45,9 @@ def get_egg_info():
     finally:
         shutil.rmtree(instdir)
 
-def make_debian(egg, force_control, changelog, additional_dependencies):
+def make_debian(egg, force_control, changelog, additional_dependencies,
+                distribution, use_old_changelog, force_copyright, 
+                force_rules, prefix):
     '''Create/update debian/* from information in egg dictionary'''
 
     if not os.path.isdir('debian'):
@@ -53,27 +55,44 @@ def make_debian(egg, force_control, changelog, additional_dependencies):
 
     if not os.path.exists('debian/compat'):
         f = open('debian/compat', 'w')
-        f.write('6\n')
+        f.write('8\n')
         f.close()
 
-    if not os.path.exists('debian/rules'):
+    prefix_string = ''
+    if prefix:
+        prefix_string = '''override_dh_auto_install:
+	dh_auto_install -- --install-scripts=%s/bin \
+                --install-data=%s \
+                --install-lib=%s
+
+override_dh_python2:
+	dh_python2 %s
+''' % (prefix, prefix, prefix, prefix)
+
+    if not os.path.exists('debian/rules') or force_rules:
         f = open('debian/rules', 'w')
         f.write('''#!/usr/bin/make -f
-DEB_PYTHON_SYSTEM := pysupport
+%%:
+ifneq ($(shell dh -l | grep -xF translations),)
+	dh $@ --with python2,translations
+else
+	dh $@ --with python2
+endif
 
-include /usr/share/cdbs/1/rules/debhelper.mk
-include /usr/share/cdbs/1/class/python-distutils.mk
-# langpack.mk is relevant on Ubuntu only, not Debian; it does not matter if it's missing
--include /usr/share/cdbs/1/rules/langpack.mk
-''')
+%s
+''' % prefix_string)
         f.close()
         os.chmod('debian/rules', 0755)
 
-    if not os.path.exists('debian/copyright'):
+    if not os.path.exists('debian/copyright') or force_copyright:
         make_copyright(egg)
-
-    make_control(egg, force_control, additional_dependencies)
-    make_changelog(egg, changelog)
+    if force_control not in ('none', 'deps', 'full'):
+        print >> sys.stderr, 'ERROR: --force-control takes one of the following options:\n' \
+            '"none", "deps", or "full"'
+        sys.exit(0)
+    if force_control != 'none':
+        make_control(egg, force_control, additional_dependencies)
+    make_changelog(egg, changelog, distribution, use_old_changelog)
 
 def make_copyright(egg):
     author = egg.get('Author', '')
@@ -81,12 +100,12 @@ def make_copyright(egg):
         author += ' <' + egg['Author-email'] + '>'
 
     f = open('debian/copyright', 'w')
-    f.write('''Format-Specification: http://wiki.debian.org/Proposals/CopyrightFormat
+    f.write('''Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: %s
-Upstream-Maintainer: %s
+Upstream-Contact: %s
 ''' % (egg['Name'], author))
     if 'Home-page' in egg:
-        print >> f, 'Upstream-Source:', egg['Home-page']
+        print >> f, 'Source:', egg['Home-page']
 
     print >> f, '\nFiles: *'
 
@@ -127,7 +146,7 @@ def make_control(egg, force_control, additional_dependencies):
  
     # calculate extra build dependencies
     bdeps = ''
-    if subprocess.call('find -name "*.ui" | xargs grep -q \'<widget class="Q\'', 
+    if subprocess.call('find -name "*.ui" | xargs grep -q \'<widget class="K\'', 
             shell=True) == 0:
         print 'Package uses KDE *.ui files, adding python-kde4-dev build dependency'
         bdeps += ',\n python-kde4-dev'
@@ -137,13 +156,11 @@ def make_control(egg, force_control, additional_dependencies):
  ${python:Depends}%s''' % ',\n '.join(['',] + list(deps) + additional_dependencies)
     }
     # add additional fields (even when updating if user chooses them)
-    if not os.path.exists('debian/control') or force_control:
+    if not os.path.exists('debian/control') or force_control == 'full':
         control_content.update({
         'Source': egg['Name'],
-        'Build-Depends': '''cdbs (>= 0.4.43),
- debhelper (>= 6),
- python,
- python-support (>= 0.6.4),
+        'Build-Depends': '''debhelper (>= 8),
+ python (>= 2.6.6-3~),
  python-distutils-extra (>= 2.10)%s''' % bdeps,
         'Maintainer': author,
         'Package': egg['Name'],
@@ -157,14 +174,12 @@ Section: python
 Priority: extra
 Build-Depends: %(Build-Depends)s
 Maintainer: %(Maintainer)s
-Standards-Version: 3.8.3
-XS-Python-Version: current
+Standards-Version: 3.9.3
+X-Python-Version: >= 2.6
 
 Package: %(Package)s
 Architecture: all
-XB-Python-Version: ${python:Versions}
-Depends: ${misc:Depends},
- ${python:Depends}%(Depends)s
+Depends: %(Depends)s
 Description: %(Description)s
 ''' % control_content)
         f.close()
@@ -197,19 +212,27 @@ Description: %(Description)s
             raise
         os.rename('debian/control.new', 'debian/control')
 
-def make_changelog(egg, changelog):
-    lsb_release = subprocess.Popen(['lsb_release', '-si'],
-            stdout=subprocess.PIPE)
-    distro = lsb_release.communicate()[0].strip()
-    assert lsb_release.returncode == 0
-
-    if distro == 'Debian':
-        release = 'unstable'
-    else:
-        lsb_release = subprocess.Popen(['lsb_release', '-sc'],
+def make_changelog(egg, changelog, distribution, use_old_changelog):
+    command = ['debchange']
+    if not distribution:
+        lsb_release = subprocess.Popen(['lsb_release', '-si'],
                 stdout=subprocess.PIPE)
-        release = lsb_release.communicate()[0].strip()
+        distro = lsb_release.communicate()[0].strip()
         assert lsb_release.returncode == 0
+
+        if distro == 'Debian':
+            release = 'unstable'
+        else:
+            lsb_release = subprocess.Popen(['lsb_release', '-sc'],
+                    stdout=subprocess.PIPE)
+            release = lsb_release.communicate()[0].strip()
+            assert lsb_release.returncode == 0
+    else:
+        release = distribution
+        # Use --force-distribution only if distribution specified by user
+        command.append('--force-distribution')
+
+    command.append('-D' + release)
 
     if not os.path.exists('/usr/bin/debchange'):
         print >> sys.stderr, 'ERROR: Could not find "debchange".\n' \
@@ -220,18 +243,23 @@ def make_changelog(egg, changelog):
         if not changelog:
             changelog = ['Initial release.']
         try:
-            assert subprocess.call(['debchange', '--create', '--package', egg['Name'],
-                '-D' + release, '-v' + egg['Version'], changelog[0]]) == 0
+            command.extend(['--create', '--package', egg['Name'], 
+                '-v' + egg['Version'], changelog[0]])
+            assert subprocess.call(command) == 0
         except OSError, e:
             print >> sys.stderr, 'ERROR: Could not run "debchange": %s\n' \
                 'You need to install the "devscripts" package for this.' % str(e)
             sys.exit(0)
     else:
         if not changelog:
-                changelog = ['New release.']
-        # this will just fail if we already have that version, which is okay.
-        subprocess.call(['debchange', '-D' + release, '-v' + egg['Version'],
-            changelog[0]], stderr=subprocess.PIPE)
+            changelog = use_old_changelog and [''] or ['New release.']
+        if not use_old_changelog:
+            command.append('-v' + egg['Version'])
+        command.append(changelog[0])
+
+        if (subprocess.call(command, stderr=subprocess.PIPE) != 0):
+            print >> sys.stderr, "Can\'t update changelog."
+            sys.exit(1)
     for message in changelog[1:]:
         subprocess.call(['debchange', message])
 
@@ -251,26 +279,25 @@ def mod2package(module):
         '/%s.py\n' % module.replace('.', '/') in out):
         return package
 
+    # try for gi modules
+    if module.startswith('gi.repository.'):
+        module_name = module.split('.')[-1]
+        try:
+            _module = __import__(module, fromlist=[module_name])
+        except RuntimeError: # thrown by Gtk without $DISPLAY
+            print '[cannot import, ignoring]',
+            return None
+        pkg = _get_pkg_from_path(_module.__path__)
+        if pkg:
+            return pkg
     # bigger hammer: dpkg -S for Python packages
     # module can be module.submodule.subsubmodule packaged independently
     # (e. g. python-desktopcouch and python-desktopcouch-records)
     module_name = module.split('.')
     while(module_name):
-        dpkg = subprocess.Popen(['dpkg', '-S', '*/%s/__init__.py' % '/'.join(module_name)],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out = dpkg.communicate()[0]
-        pkgs = set()
-        for line in out.splitlines():
-            pkgs.add(line.split(':')[0])
-        if len(pkgs) == 1:
-            package = list(pkgs)[0]
-            return package
-        elif len(pkgs) > 1:
-            py_pkgs = [p for p in pkgs if p.startswith('python-')]
-            if len(py_pkgs) == 1:
-                return py_pkgs[0]
-            else:
-                print '[dpkg -S found more than one package: %s; ignoring]' % ', '.join(pkgs),
+        pkg = _get_pkg_from_path('*/%s/__init__.py' % '/'.join(module_name))
+        if pkg:
+            return pkg
         module_name = module_name[:-1]
 
     # bigger hammer: dpkg -S for compiled extensions
@@ -279,7 +306,11 @@ def mod2package(module):
     out = dpkg.communicate()[0]
     pkgs = set()
     for line in out.splitlines():
-        pkgs.add(line.split(':')[0])
+        p = line.split(':')[0]
+        # ignore debug extensions
+        if p.endswith('-dbg'):
+            continue
+        pkgs.add(p)
     if len(pkgs) == 1:
         return list(pkgs)[0]
     elif len(pkgs) > 1:
@@ -287,18 +318,46 @@ def mod2package(module):
 
     return None
 
+def _get_pkg_from_path(path):
+    dpkg = subprocess.Popen(['dpkg', '-S', path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out = dpkg.communicate()[0]
+    pkgs = set()
+    for line in out.splitlines():
+        pkgs.add(line.split(':')[0])
+    if len(pkgs) == 1:
+        package = list(pkgs)[0]
+        return package
+    elif len(pkgs) > 1:
+        py_pkgs = [p for p in pkgs if p.startswith('python-')]
+        if len(py_pkgs) == 1:
+            return py_pkgs[0]
+        else:
+            print '[dpkg -S found more than one package: %s; ignoring]' % ', '.join(pkgs),
+    return None
+
 #
 # main
 #
 usage = "usage: %prog [options]"
 parser = OptionParser(prog='python_mkdebian', usage=usage, version=pkgversion)
-parser.add_option('', '--force-control', dest='force_control', action='store_true',
-                  help='Force whole control file to be recreated')
+parser.add_option('', '--force-control', dest='force_control', action='store',
+                  help='Force control file behaviour. Can be one of "none" (keep unchanged), "deps" (only update dependencies), or "full" (recreate whole file). By default only dependencies will be updated ("deps").')
+parser.add_option('', '--force-copyright', dest='force_copyright', action='store_true',
+                  help='Force the copyright file to be recreated')
+parser.add_option('', '--force-rules', dest='force_rules', action='store_true',
+                  help='Force the rules file to be recreated')
 parser.add_option('', '--changelog', dest='changelog', action='append',
                   help='Add string changelog to debian/changelog (can be specified multiple times)')
 parser.add_option('', '--dependency', dest='dependencies', action='append',
                   help='Add additional debian package dependency (can be specified multiple times)')
-parser.set_defaults(changelog=None, dependencies=[])
+parser.add_option('-D', '--distribution', dest='distribution', action='store',
+                  help='Specify which Debian/Ubuntu distribution should be used in the changelog')
+parser.add_option('', '--no-changelog', dest='use_old_changelog', action='store_true',
+                  help='Don\'t create a new changelog entry')
+parser.add_option('', '--prefix', dest='prefix', action='store',
+                  help='Ask to install into a dedicated prefix')
+parser.set_defaults(changelog=None, dependencies=[], force_control="deps", distribution=None, use_old_changelog=False, prefix=None)
 options, args = parser.parse_args()
 
 # switch stdout to line buffering, for scripts reading our output on the fly
@@ -307,4 +366,9 @@ sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
 egg = get_egg_info()
 make_debian(egg, force_control=options.force_control,
                  changelog=options.changelog,
-                 additional_dependencies=options.dependencies)
+                 additional_dependencies=options.dependencies,
+                 distribution=options.distribution,
+                 use_old_changelog=options.use_old_changelog,
+                 force_copyright=options.force_copyright,
+                 force_rules=options.force_rules,
+                 prefix=options.prefix)

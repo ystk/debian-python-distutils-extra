@@ -33,9 +33,20 @@ has complete information it will work with any distutils setup.
 
 .SH OPTIONS
 .TP
-\fB\-\-force\-control\fR
-Force whole control file to be recreated. By default it will not touch an
-already existing control file, so that you can customize them.
+\fB\-\-force\-control\fR=\fIFORCE_CONTROL\fR
+Force control file behaviour. Can be one of "none" (keep unchanged), "deps" 
+(only update dependencies), or "full" (recreate whole file). By default
+only dependencies will be updated ("deps").
+
+.TP
+\fB\-\-force\-copyright\fR
+Force whole copyright file to be recreated. By default it will not touch an
+already existing copyright file, so that you can customize them.
+
+.TP
+\fB\-\-force\-rules\fR
+Force whole rules file to be recreated. By default it will not touch an
+already existing rules file, so that you can customize them.
 
 .TP
 \fB\-\-changelog\fR=\fICHANGELOG\fR
@@ -45,6 +56,9 @@ specified multiple times)
 \fB\-\-dependency\fR=\fIPACKAGENAME\fR
 Add additional debian package dependency (can be
 specified multiple times)
+.TP
+\fB\-\-prefix\fR=\fIPREFIX\fR
+Ask for installing all your modules in the dedicated PREFIX (default is /usr)
 .TP
 \fB\-\-version\fR
 Show program's version number and exit

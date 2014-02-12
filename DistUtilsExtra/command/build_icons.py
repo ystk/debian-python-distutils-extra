@@ -35,7 +35,9 @@ class build_icons(distutils.cmd.Command):
             for category in glob.glob(os.path.join(size, "*")):
                 icons = []
                 for icon in glob.glob(os.path.join(category,"*")):
-                    icons.append(icon)
+                    if not os.path.islink(icon):
+                        icons.append(icon)
+                if icons:
                     data_files.append(("share/icons/hicolor/%s/%s" % \
                                        (os.path.basename(size), \
                                         os.path.basename(category)), \
