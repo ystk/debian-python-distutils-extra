@@ -109,7 +109,7 @@ Upstream-Contact: %s
 
     print >> f, '\nFiles: *'
 
-    cgrep = subprocess.Popen("find -type f ! -name 'COPYING*' ! -name LICENSE !  -name '*.pyc' ! -path '*/.*' ! -path './debian/*' ! -name '*.pot' | xargs grep -hi '(c)' | sed 's/^.*([cC])/Copyright: (C)/' | sort -u",
+    cgrep = subprocess.Popen("find -type f ! -name 'COPYING*' ! -name LICENSE !  -name '*.pyc' ! -path '*/.*' ! -path './debian/*' ! -name '*.pot' ! -name '*~' | xargs grep -hi '(c)' | sed 's/<\/property>//' | sed 's/&lt;/</' | sed 's/&gt;/>/' | sed 's/^.*([cC])/Copyright: (C)/' | sort -u",
             shell=True, stdout=subprocess.PIPE)
     out = cgrep.communicate()[0]
     assert cgrep.returncode == 0

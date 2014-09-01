@@ -17,7 +17,7 @@ Build-Depends: debhelper (>= 7.0.50~),
  python3-gi,
  gir1.2-glib-2.0,
  intltool
-Standards-Version: 3.9.3
+Standards-Version: 3.9.4
 Vcs-Bzr: http://bazaar.launchpad.net/~python-distutils-extra-hackers/python-distutils-extra/debian
 Vcs-Browser: https://code.launchpad.net/~python-distutils-extra-hackers/python-distutils-extra/debian
 
