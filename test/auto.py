@@ -613,7 +613,7 @@ setup(
         '''manpages'''
 
         self._mksrc('man/foo.1', '.TH foo 1 "Jan 01, 1900" "Joe Developer"')
-        self._mksrc('daemon/food.8', '.TH food 8 "Jan 01, 1900" "Joe Developer"')
+        self._mksrc('daemon/food.8', '.\" some comment\n.TH food 8 "Jan 01, 1900" "Joe Developer"')
         self._mksrc('cruft/food.1', '')
         self._mksrc('daemon/notme.s', '.TH food 8 "Jan 01, 1900" "Joe Developer"')
 
@@ -743,12 +743,10 @@ print ('import iamnota.module')
     def test_help_docbook(self):
         '''Docbook XML help'''
 
-        self._mksrc('help/C/myprogram-C.omf')
-        self._mksrc('help/C/myprogram.xml')
+        self._mksrc('help/C/index.docbook')
         self._mksrc('help/C/legal.xml')
         self._mksrc('help/C/figures/mainscreen.png')
-        self._mksrc('help/de/myprogram-de.omf')
-        self._mksrc('help/de/myprogram.xml')
+        self._mksrc('help/de/index.docbook')
         self._mksrc('help/de/legal.xml')
         self._mksrc('help/de/figures/mainscreen.png')
 
@@ -763,14 +761,12 @@ print ('import iamnota.module')
         self.assertTrue('\n  help/notme.png\n' in o)
 
         f = self.installed_files()
-        self.assertTrue('/usr/share/omf/foo/myprogram-C.omf' in f)
-        self.assertTrue('/usr/share/omf/foo/myprogram-de.omf' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/C/myprogram.xml' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/C/legal.xml' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/C/figures/mainscreen.png' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/de/myprogram.xml' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/de/legal.xml' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/de/figures/mainscreen.png' in f)
+        self.assertTrue('/usr/share/help/C/foo/index.docbook' in f)
+        self.assertTrue('/usr/share/help/C/foo/legal.xml' in f)
+        self.assertTrue('/usr/share/help/C/foo/figures/mainscreen.png' in f)
+        self.assertTrue('/usr/share/help/de/foo/index.docbook' in f)
+        self.assertTrue('/usr/share/help/de/foo/legal.xml' in f)
+        self.assertTrue('/usr/share/help/de/foo/figures/mainscreen.png' in f)
 
     def test_help_mallard(self):
         '''Mallard XML help'''
@@ -793,13 +789,12 @@ print ('import iamnota.module')
         self.assertTrue('\n  help/notme.png\n' in o)
 
         f = self.installed_files()
-        self.assertFalse('/usr/share/omf/foo' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/C/index.page' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/C/legal.page' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/C/figures/mainscreen.png' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/de/index.page' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/de/legal.page' in f)
-        self.assertTrue('/usr/share/gnome/help/foo/de/figures/mainscreen.png' in f)
+        self.assertTrue('/usr/share/help/C/foo/index.page' in f)
+        self.assertTrue('/usr/share/help/C/foo/legal.page' in f)
+        self.assertTrue('/usr/share/help/C/foo/figures/mainscreen.png' in f)
+        self.assertTrue('/usr/share/help/de/foo/index.page' in f)
+        self.assertTrue('/usr/share/help/de/foo/legal.page' in f)
+        self.assertTrue('/usr/share/help/de/foo/figures/mainscreen.png' in f)
 
     def test_binary_files(self):
         '''Binary files are ignored'''

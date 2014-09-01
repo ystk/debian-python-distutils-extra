@@ -320,10 +320,15 @@ def __manpages(attrs, src):
 
     mans = {}
     for f in src_fileglob(src, '*.[0123456789]'):
-        line = open(f).readline()
-        if line.startswith('.TH '):
-            src_mark(src, f)
-            mans.setdefault(f[-1], []).append(f)
+        with open(f) as fd:
+            for line in fd:
+                if line.startswith('.\"'):
+                    continue
+                if line.startswith('.TH '):
+                    src_mark(src, f)
+                    mans.setdefault(f[-1], []).append(f)
+                break
+
     v = attrs.setdefault('data_files', [])
     for section, files in mans.items():
         v.append((os.path.join('share', 'man', 'man' + section), files))

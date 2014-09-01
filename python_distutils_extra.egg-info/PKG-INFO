@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: python-distutils-extra
-Version: 2.36
+Version: 2.38
 Summary: Add support for i18n, documentation and icons to distutils
 Home-page: UNKNOWN
 Author: Sebastian Heinlein, Martin Pitt
